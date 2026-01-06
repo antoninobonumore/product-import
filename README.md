@@ -6,20 +6,43 @@ This library imports product data into Magento 2 via direct database queries. It
 
 * A programming library to import products
 * An CLI command for product import via XML file
-* An Web API service for product import via Post Request with XML
+* A web API service for product import via Post Request with XML
 * A tool to update url_rewrites
 
-## Warning!
+## Note
 
 The aim of this library is speed. If you find that Magento 2's product importer is too slow, consider using this library.
 
-However, the library bypasses all of Magento's API's to insert data directly into the database. Possible problems you may encounter:
-
-* The library is still new and brings with it its own set of bugs and problems!
-* The library creator is not perfectly knowledgeable of all Magento's ins and outs (even though he tries hard to be). It is possible that the data is not entered in exactly the same way that Magento 2 does it.
-* The library probably does not have all features you need and expect.
-
 Experiment with the library in a safe webshop. Make sure to create a database backup before you start.
+
+## Sample code
+
+Let me show you a piece of code to give you an impression what it is like to use this library:
+
+        $importer = $factory->createImporter($config);
+
+        foreach ($lines as $i => $line) {
+
+            $product = new SimpleProduct($line[1]);
+
+            // global eav attributes
+            $global = $product->global();
+            $global->setName($line[0]);
+            $global->setPrice($line[2]);
+
+            // German eav attributes
+            $german = $product->storeView('de_store');
+            $german->setName($line[3]);
+            $german->setPrice($line[4]);
+
+            $importer->importSimpleProduct($product);
+        }
+
+        // process any remaining products in the pipeline
+        $importer->flush();
+
+ 
+Continue to read [the full documentation](doc/importer.md)
 
 ## Installation
 
@@ -30,7 +53,6 @@ Experiment with the library in a safe webshop. Make sure to create a database ba
 * For Magento 2.1+ Opensource Edition
 * Requires >= PHP 7.0
 * Input in UTF-8 (Magento standard)
-* MySQL max_packet_size on both MySQL client and MySQL server must be at least 1 MB (Which will be the case if the value wasn't deliberately lowered from the default)
 * Unix family system
 
 ## Features of the Import Library
@@ -52,6 +74,9 @@ Experiment with the library in a safe webshop. Make sure to create a database ba
 * importing links to products have not been imported yet
 * dry run (no products are written to the database)
 * multi-source inventory (msi)
+* weee taxes
+* removes the url_path attribute of imported products
+* M2EPro notification
 
 Continue to read about [all importer features](doc/importer.md)
 

@@ -43,16 +43,20 @@ class HttpCache
                 // stored headers must exist
                 if (file_exists($headerFile)) {
 
-                    $headers = json_decode(file_get_contents($headerFile), true);
-                    $now = time();
-                    $useCache = $this->useCache($headers, $now);
+                    $fileContent = file_get_contents($headerFile);
+                    if (!empty($fileContent)) {
 
-                    if ($useCache === true) {
-                        // $temporaryStoragePath still holds fresh data
-                        return "";
-                    } elseif ($useCache !== false) {
-                        // use an e-tag while fetching image
-                        $conditions = $useCache;
+                        $headers = json_decode($fileContent, true);
+                        $now = time();
+                        $useCache = $this->useCache($headers, $now);
+
+                        if ($useCache === true) {
+                            // $temporaryStoragePath still holds fresh data
+                            return "";
+                        } elseif ($useCache !== false) {
+                            // use an e-tag while fetching image
+                            $conditions = $useCache;
+                        }
                     }
                 }
             }
@@ -131,7 +135,7 @@ class HttpCache
         return false;
     }
 
-    public function downloadFromUrl(string $url, string $localTargetFile, array $conditions = null)
+    public function downloadFromUrl(string $url, string $localTargetFile, ?array $conditions = null)
     {
         $responseHeaders = [
             self::UNIX_TIME => time(),
@@ -178,7 +182,6 @@ class HttpCache
         $error = curl_error($ch);
         $httpResponseCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
-        curl_close($ch);
         fclose($fp);
 
         if ($conditions) {

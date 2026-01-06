@@ -142,6 +142,15 @@ It will help you use this library by understanding how I use certain words:
 
 When Magento 2 uses "name" where I would use "code", I follow Magento. "attribute_set_name" For instance, would qualify as a code in my view, but I call it "name" to be consistent with Magento.
 
+## SKU is case sensitive
+
+The SKU is case sensitive. The sku "Red-book" will not match an sku "red-book".
+
+If you have SKU's as input that do not match by case, you need to convert them to case sensitive sku's using
+
+    $information = new Information();   // or inject
+    $sku = $this->information->getCaseSensitiveSku($rawSku);
+
 ## Empty values and removing attributes
 
 Imports often contain empty fields. When this happens this can mean one of two things:
@@ -235,7 +244,7 @@ Entering values by option id is possible as well.
 
 The library will create options for attributes if they do not exist, but only for attributes listed in the config array:
 
-    $config->autoCreateOptionAttributes(['color_group', 'length']);
+    $config->autoCreateOptionAttributes = ['color_group', 'length'];
 
 ## Stock items
 
@@ -465,14 +474,20 @@ You can also use ids
 
     $product->addCategoryIds([123, 125]);
 
-The importer does not test whether the the ids exist and will throw an database exception if they don't.
+The importer does not test whether the ids exist and will throw an database exception if they don't.
 
 When your import set contains categories with a / in the name, like "Summer / Winter collection", you may want to change the category name separator into something else, like "$"
 Make sure to update the imported category paths when you do.
 
     $config->categoryNamePathSeparator = "$";
 
-Note: the library only adds and updates categories. It does not remove categories that are not mentioned in the set call.
+By default, the library only adds and updates product-to-category links. It does not remove categories that are not mentioned.
+
+If you do want existing product-to-category links that are not mentioned in the import to be removed, use
+
+    $config->categoryStrategy = ImportConfig::CATEGORY_STRATEGY_SET;
+    
+But a word of warning is needed here. It is very common for a shop administrator to place products in categories manually, even when an automated product sync is in place. Categories like "Sale", for example, may be managed by the administrator. If this has happened before the importer is run with this 'set' option, then these manual changes will be removed. So consider if this happens in the shop, before using this setting.
 
 ## Websites
 
@@ -482,7 +497,7 @@ You can specify on which websites a product is used, by specifying their codes
 
 or their ids
 
-    $product->setWebsiteIds([1, 3, 4]);
+    $product->setWebsitesIds([1, 3, 4]);
 
 ## Images
 
@@ -563,11 +578,27 @@ Import all tier prices of a product with
     $product->setTierPrices([
         new TierPrice(10, '12.25', 'General', 'base'),
         new TierPrice(20, '12.10'),
+        new TierPrice(10, '0', 'General', 'base', '20'),
     ]);
 
 The first tier price in this example contains a minimum quantity, a price, the name (code) of the customer group, and the code of a website.
 
 The second tier price does not contain a customer group and no website code. This signifies that all customer groups and all websites are affected by this tier price.
+
+The third tier price contains a percentage in stead of a fixed value (M2.2+)
+
+## Weee taxes
+
+To import Waste Electrical and Electronic Equipment taxes, use
+
+    $product->setWeees([
+        Weee::createWeee('NL', 5.0, 1, Weee::DEFAULT_STATE),
+        Weee::createWeee('ES', 3.0, 1, Weee::DEFAULT_STATE)
+    ]);
+    
+The last argument is the region (state) of the country. If you don't need a specific state, use DEFAULT_STATE. Otherwise you need to look up the region_id of the state in the `directory_country_region` table.
+
+Weee attributes are custom attributes with as "catalog input type" the value "Fixed product tax". The importer assumes and finds only a single attribute. Multiple weee attributes are not supported.     
 
 ## URL keys
 
@@ -608,6 +639,26 @@ Within the import session you want to temporarily allow two products to have the
     $config->duplicateUrlKeyStrategy = ImportConfig::DUPLICATE_KEY_STRATEGY_ALLOW;
 
 Needless to say: be careful with this, because it can cause the corrupt state with duplicate url_keys.
+
+## Url keys - the locale
+
+When a url key is generated, the importer uses the TRANSLIT function of `iconv` to convert non-ASCII characters to their closest ASCII representatives. This function uses locale libraries that are provided by the operating system.
+
+The actual locale that iconv uses is determined by the environment variable `LC_CTYPE`.
+
+When is this important?
+
+If you notice that characters are missing from the generated url_key, this may mean that the LC_CTYPE does not match an existing locale.
+
+Find out if your locale has been set explicitly
+
+    echo $LC_CTYPE
+
+Check if it matches one of the installed locales
+
+    locale -a
+    
+There is an other reason you may want to think about the locale. If you are concerned about the way non-ascii characters are converted into ascii, you may set the LC_CTYPE variable explicitly to the one you want. More information [here](https://www.php.net/manual/en/function.iconv.php).
 
 ## Url rewrites
 
@@ -758,6 +809,16 @@ or even
     $importer->getCacheManager()->resetAll();
 
 Using these functions excessively affects the performance of the library negatively.
+
+## M2EPro
+
+[M2EPro](https://m2epro.com/) is an extension that synchronizes data with several sales channels.
+
+To inform M2EPro, if installed, of all changes that were made to products, use:
+
+    $config->M2EPro0 = ImportConfig::M2EPRO_YES;
+
+Do not enable the Track Direct Database Changes in M2EPro, if you are using this feature.
 
 ## Dry run
 

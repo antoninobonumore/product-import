@@ -31,8 +31,14 @@ class Validator
     /** @var CustomOptionsValidator */
     protected $customOptionsValidator;
 
+    /** @var WeeeValidator */
+    protected $weeeValidator;
+
     /** @var ConfigurableValidator */
     protected $configurableValidator;
+
+    /** @var BundleValidator */
+    protected $bundleValidator;
 
     /** @var GroupedValidator */
     protected $groupedValidator;
@@ -41,14 +47,18 @@ class Validator
         MetaData $metaData,
         ImageValidator $imageValidator,
         CustomOptionsValidator $customOptionsValidator,
+        WeeeValidator $weeeValidator,
         ConfigurableValidator $configurableValidator,
+        BundleValidator $bundleValidator,
         GroupedValidator $groupedValidator)
     {
         $this->metaData = $metaData;
         $this->imageValidator = $imageValidator;
         $this->customOptionsValidator = $customOptionsValidator;
+        $this->weeeValidator = $weeeValidator;
         $this->configurableValidator = $configurableValidator;
         $this->groupedValidator = $groupedValidator;
+        $this->bundleValidator = $bundleValidator;
     }
 
     /**
@@ -93,10 +103,12 @@ class Validator
 
         // category_ids
         $categoryIds = $product->getCategoryIds();
-        foreach ($categoryIds as $id) {
-            if (!preg_match('/^\d+$/', $id)) {
-                $product->addError("category_ids should be an array of integers");
-                break;
+        if ($categoryIds !== null) {
+            foreach ($categoryIds as $id) {
+                if (!preg_match('/^\d+$/', $id)) {
+                    $product->addError("category_ids should be an array of integers");
+                    break;
+                }
             }
         }
 
@@ -144,6 +156,9 @@ class Validator
         // custom options
         $this->customOptionsValidator->validateCustomOptions($product);
 
+        // weee
+        $this->weeeValidator->validateWeees($product);
+
         // other attributes
         foreach ($storeViews as $storeViewCode => $storeView) {
 
@@ -174,7 +189,7 @@ class Validator
                         }
                         break;
                     case EavAttributeInfo::TYPE_DECIMAL:
-                        if (!preg_match(Decimal::DECIMAL_PATTERN, $value)) {
+                        if (!preg_match(Decimal::$decimalEavPattern, $value)) {
                             $product->addError($eavAttribute . " is not a decimal number with dot (" . $value . ")");
                         } elseif ($value < 0.00) {
                             if (in_array($eavAttribute, [ProductStoreView::ATTR_PRICE, ProductStoreView::ATTR_SPECIAL_PRICE, ProductStoreView::ATTR_COST, ProductStoreView::ATTR_WEIGHT, ProductStoreView::ATTR_MSRP])) {
@@ -223,15 +238,26 @@ class Validator
                 }
             }
         }
+    }
 
+    /**
+     * @param Product $product
+     * @param Product[] $batchProducts
+     */
+    public function validateCompound(Product $product, array $batchProducts)
+    {
         switch ($product->getType()) {
             case ConfigurableProduct::TYPE_CONFIGURABLE:
                 /** @var ConfigurableProduct $product */
-                $this->configurableValidator->validate($product);
+                $this->configurableValidator->validate($product, $batchProducts);
                 break;
             case GroupedProduct::TYPE_GROUPED:
                 /** @var GroupedProduct $product */
-                $this->groupedValidator->validate($product);
+                $this->groupedValidator->validate($product, $batchProducts);
+                break;
+            case BundleProduct::TYPE_BUNDLE:
+                /** @var BundleProduct $product */
+                $this->bundleValidator->validate($product, $batchProducts);
         }
     }
 }

@@ -46,7 +46,7 @@ class ProductEntityStorage
         return $this->db->fetchMap("
             SELECT `sku`, `entity_id` 
             FROM `{$this->metaData->productEntityTable}`
-            WHERE `sku` IN (" . $this->db->getMarks($skus) . ")
+            WHERE BINARY `sku` IN (" . $this->db->getMarks($skus) . ")
         ", array_values($skus));
     }
 
@@ -78,7 +78,7 @@ class ProductEntityStorage
         $type = $this->db->fetchSingleCell("
             SELECT `type_id`
             FROM {$this->metaData->productEntityTable}
-            WHERE `sku` = ?
+            WHERE BINARY `sku` = ?
         ", [
             $sku
         ]);
@@ -235,7 +235,7 @@ class ProductEntityStorage
             $sku2id = $this->db->fetchMap("
                 SELECT `sku`, `entity_id` 
                 FROM `{$this->metaData->productEntityTable}` 
-                WHERE `sku` IN (" . $this->db->getMarks($skus) . ")
+                WHERE BINARY `sku` IN (" . $this->db->getMarks($skus) . ")
             ", array_values($skus));
 
             foreach ($products as $product) {
@@ -345,12 +345,112 @@ class ProductEntityStorage
     /**
      * @param Product[] $products
      */
+    public function removeOldCategoryIds(array $products)
+    {
+        if (empty($products)) { return; }
+
+        $productIds = array_column($products, 'id');
+
+        // load existing links
+        $rows = $this->db->fetchAllAssoc("
+            SELECT `category_id`, `product_id`
+            FROM `" . $this->metaData->categoryProductTable . "`
+            WHERE `product_id` IN (" . implode(',', $productIds) . ")
+        ");
+
+        // collect existing links
+        $toBeRemoved = [];
+        foreach ($rows as $row) {
+            $toBeRemoved[$row['product_id']][$row['category_id']] = true;
+        }
+
+        // remove links from this set that are present in the import
+        foreach ($products as $product) {
+            $categoryIds = $product->getCategoryIds();
+            if ($categoryIds === null) {
+                // categories are not used in the import; skip
+                unset($toBeRemoved[$product->id]);
+            } else {
+                foreach ($categoryIds as $categoryId) {
+                    unset($toBeRemoved[$product->id][$categoryId]);
+                }
+            }
+        }
+
+        // delete links one by one (there won't be many)
+        foreach ($toBeRemoved as $productId => $categoryIds) {
+            foreach ($categoryIds as $categoryId => $true) {
+                $this->db->execute("
+                    DELETE FROM `" . $this->metaData->categoryProductTable . "`
+                    WHERE `product_id` = ? AND `category_id` = ?
+                ", [
+                    $productId,
+                    $categoryId
+                ]);
+            }
+        }
+    }
+
+    /**
+     * @param  Product[] $products
+     */
+    public function removeOldWebsiteIds(array $products)
+    {
+        if (empty($products)) { return; }
+
+        $productIds = array_column($products, 'id');
+
+        // load existing links
+        $rows = $this->db->fetchAllAssoc("
+            SELECT `website_id`, `product_id`
+            FROM `" . $this->metaData->productWebsiteTable . "`
+            WHERE `product_id` IN (" . implode(',', $productIds) . ")
+        ");
+
+        // collect existing links
+        $toBeRemoved = [];
+        foreach ($rows as $row) {
+            $toBeRemoved[$row['product_id']][$row['website_id']] = true;
+        }
+
+        // remove links from this set that are present in the import
+        foreach ($products as $product) {
+            $websiteIds = $product->getWebsiteIds();
+            if ($websiteIds === null) {
+                // websites are not used in the import; skip
+                unset($toBeRemoved[$product->id]);
+            } else {
+                foreach ($websiteIds as $websiteId) {
+                    unset($toBeRemoved[$product->id][$websiteId]);
+                }
+            }
+        }
+
+        // delete links one by one (there won't be many)
+        foreach ($toBeRemoved as $productId => $websiteIds) {
+            foreach ($websiteIds as $websiteId => $true) {
+                $this->db->execute("
+                    DELETE FROM `" . $this->metaData->productWebsiteTable . "`
+                    WHERE `product_id` = ? AND `website_id` = ?
+                ", [
+                    $productId,
+                    $websiteId
+                ]);
+            }
+        }
+    }
+
+    /**
+     * @param Product[] $products
+     */
     public function insertCategoryIds(array $products)
     {
         $values = [];
 
         foreach ($products as $product) {
-            foreach ($product->getCategoryIds() as $categoryId) {
+            $categoryIds = $product->getCategoryIds();
+            if ($categoryIds === null) { continue; }
+            foreach ($categoryIds as $categoryId) {
                 $values[] = $categoryId;
                 $values[] = $product->id;
             }
@@ -382,5 +482,19 @@ class ProductEntityStorage
         // 2. do not fail if the website does not exist
 
         $this->db->insertMultipleWithIgnore($this->metaData->productWebsiteTable, ['product_id', 'website_id'], $values, Magento2DbConnection::_1_KB);
+    }
+
+    /**
+     * @param Product[] $products
+     */
+    public function removeUrlPaths(array $products)
+    {
+        $productIds = array_column($products, 'id');
+        $attributeId = $this->metaData->productEavAttributeInfo[ProductStoreView::ATTR_URL_PATH]->attributeId;
+
+        $this->db->deleteMultipleWithWhere(
+            $this->metaData->productEntityVarcharTable,
+            "entity_id", $productIds,
+            "attribute_id = {$attributeId}");
     }
 }

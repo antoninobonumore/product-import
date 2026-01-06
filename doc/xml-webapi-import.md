@@ -17,29 +17,21 @@ The main webapi URL is
 
     /rest/V1/bigbridge/products
 
-The url can be extended with extra parameters that will be passed to the import configuration:
+The url can be extended with extra parameters that will be passed to the import configuration.
+
+### Dry run
 
 Perform a dry run only
 
     dry-run=1
 
+### Attribute options
+
 Supply attributes for automatic option creation
 
     auto-create-option[]=manufacturer&auto-create-option[]=color_group
 
-Is product type changed allowed?
-
-    product-type-change=allowed
-    product-type-change=forbidden
-
-What image caching to use?
-Check the local cache for existing images
-
-    image-caching=check-import-dir
-
-Use HTTP Cache
-
-    image-caching=http-caching
+### Categories
 
 Create categories automatically:
 
@@ -49,13 +41,31 @@ Select an alternative category path separator
 
     path-separator=!
 
-Specify the base dir for images
+The attribute url_path of a generated category contains all parent categories by default (i.e. 'furniture/tables/corner-chairs'). We'll call this "segmented". To create a simple url_path ('corner-chairs'), change this setting to 'flat':
 
-    image-source-dir=http://source-of-images.net
+    category-url-type=flat
 
-Specify an alternative local image cache directory
+By default, existing product-category links are not removed when they are not part of the import. This is done because content managers often need to place products in categories other than the ones defined in the import.  
 
-    image-cache-dir=/tmp
+If you want these links to be removed anyway, this can be done by:
+
+    category-strategy=set
+
+("Set" here means: set values as specified)
+
+### Empty values
+
+Handling empty element values
+
+Remove existing textual attribute values whose values in the XML are empty
+
+    empty-text=remove
+
+Remove existing non-textual attribute values whose values in the XML are empty
+
+    empty-non-text=remove
+
+### Url keys
 
 Base url_key on SKU
 
@@ -73,15 +83,60 @@ allow duplicates
 
     url-key-strategy=allow
 
-Handling empty element values
+### Images
 
-Remove existing textual attribute values whose values in the XML are empty
+Specify the base dir for images
 
-    empty-text=remove
+    image-source-dir=http://source-of-images.net
 
-Remove existing non-textual attribute values whose values in the XML are empty
+Specify an alternative local image cache directory
 
-    empty-non-text=remove
+    image-cache-dir=/tmp
+    
+Specify the type of images caching (default is force-download)
+
+check the directory where images are cached (pub/media/import) first
+
+    image-caching=check-import-dir
+    
+use HTTP caching techniques
+
+    image-caching=http-caching
+
+Set the image strategy to remove images that are not mentioned in the import (default: add)
+
+    image=set
+
+### Product types
+
+Is product type changed allowed (default: non-destructive)?
+
+    product-type-change=allowed
+    product-type-change=forbidden
+
+### Urls rewrites
+
+By default, existing url rewrites are redirected to new url rewrites.
+
+If you don't need redirects, you can skip their creation and remove existing redirects with
+
+    redirect=delete
+
+If you don't need urls with category paths, and remove existing redirects, use
+
+    category-path-urls=delete
+
+### M2EPro updates
+
+[M2EPro](https://m2epro.com/) is an extension that synchronizes data with several sales channels.
+
+To inform M2EPro, if installed, of all changes that were made to products, use:
+
+    m2epro=yes
+
+Do not enable the Track Direct Database Changes in M2EPro, if you are using this feature.
+
+### XSD validation
 
 Skip XSD validation
 

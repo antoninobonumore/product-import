@@ -40,6 +40,13 @@ class ImportConfig
     public $resultCallback = null;
 
     /**
+     * An array of attribute codes of select or multiple select attributes whose options should be created by the import if they did not exist.
+     *
+     * @var array
+     */
+    public $autoCreateOptionAttributes = [];
+
+    /**
      * Create categories if they do not exist.
      *
      * true: creates categories
@@ -50,11 +57,60 @@ class ImportConfig
     public $autoCreateCategories = true;
 
     /**
-     * An array of attribute codes of select or multiple select attributes whose options should be created by the import if they did not exist.
+     * Categories are imported by paths of category-names, like this "Doors/Wooden Doors/Specials"
+     * When your import set contains categories with a / in the name, like "Summer / Winter collection",
+     * you may want to change the category name separator into something else, like "$"
+     * Make sure to update the imported category paths when you do.
      *
-     * @var array
+     * @var string
      */
-    public $autoCreateOptionAttributes = [];
+    public $categoryNamePathSeparator = self::DEFAULT_CATEGORY_PATH_SEPARATOR;
+
+    const CATEGORY_URL_FLAT = 'flat';
+    const CATEGORY_URL_SEGMENTED = 'segmented';
+
+    /**
+     * A category url_path of generated categories is segmented by default (i.e. 'furniture/tables/corner-chairs')
+     * To create simple a url_path ('corner-chairs'), change it to 'flat'.
+     *
+     * @var string
+     */
+    public $categoryUrlType = self::CATEGORY_URL_SEGMENTED;
+
+    /**
+     * How to deal with the imported categories?
+     * - add: link products to categories named in the import
+     * - set: like add, and delete links too
+     *
+     * Important!
+     * The 'set' option compares existing product-to-category links with the ones mentioned in the import.
+     * Existing links that are not named in the import are removed.
+     * Consider the possibility that a shop administrator manually adds products to categories that are not part of the import,
+     * such as "New" or "Sale". The importer will remove these links and undo the work of a shop administrator.
+     * So, use this option only if you are certain that the shop administrator does not add products to categories manually.
+     *
+     * @var string
+     */
+    public $categoryStrategy = self::CATEGORY_STRATEGY_ADD;
+
+    const CATEGORY_STRATEGY_ADD = 'add'; // Only add and update category links
+    const CATEGORY_STRATEGY_SET = 'set'; // Add and update category links; and also remove existing category links not named in the import
+
+    /**
+     * How to deal with the imported websites?
+     * - add: link products to websites named in the import
+     * - set: like add, and delete links too
+     *
+     * Important!
+     * The 'set' option compares existing product-to-website links with the ones mentioned in the import.
+     * Existing links that are not named in the import are removed.
+     *
+     * @var string
+     */
+    public $websiteStrategy = self::WEBSITE_STRATEGY_ADD;
+
+    const WEBSITE_STRATEGY_ADD = 'add'; // Only add and update website links
+    const WEBSITE_STRATEGY_SET = 'set'; // Add and update website links; and also remove existing website links not named in the import
 
     /**
      * How to handle varchar and text fields with value ""?
@@ -101,16 +157,6 @@ class ImportConfig
     const DUPLICATE_KEY_STRATEGY_ADD_SKU = 'add-sku';
     const DUPLICATE_KEY_STRATEGY_ADD_SERIAL = 'add-serial';
     const DUPLICATE_KEY_STRATEGY_ALLOW = 'allow';
-
-    /**
-     * Categories are imported by paths of category-names, like this "Doors/Wooden Doors/Specials"
-     * When your import set contains categories with a / in the name, like "Summer / Winter collection",
-     * you may want to change the category name separator into something else, like "$"
-     * Make sure to update the imported category paths when you do.
-     *
-     * @var string
-     */
-    public $categoryNamePathSeparator = self::DEFAULT_CATEGORY_PATH_SEPARATOR;
 
     /**
      * Base directory the source images with relative paths
@@ -180,4 +226,13 @@ class ImportConfig
 
     const KEEP_CATEGORY_REWRITES = "keep"; // keep url_rewrites with category paths, create new ones
     const DELETE_CATEGORY_REWRITES = "delete"; // remove any existing redirects, and do not create new ones
+
+    /**
+     * Support for M2EPro
+     */
+    public $M2EPro = self::M2EPRO_NO;
+
+    const M2EPRO_NO = "no";
+    const M2EPRO_YES = "yes";
+
 }

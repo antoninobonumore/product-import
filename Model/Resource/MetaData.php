@@ -4,6 +4,7 @@ namespace BigBridge\ProductImport\Model\Resource;
 
 use BigBridge\ProductImport\Api\Data\Product;
 use BigBridge\ProductImport\Api\Data\ProductStoreView;
+use BigBridge\ProductImport\Helper\Decimal;
 use BigBridge\ProductImport\Model\Data\EavAttributeInfo;
 use BigBridge\ProductImport\Model\Data\LinkInfo;
 use BigBridge\ProductImport\Model\Persistence\Magento2DbConnection;
@@ -11,6 +12,10 @@ use BigBridge\ProductImport\Model\Resource\Serialize\JsonValueSerializer;
 use BigBridge\ProductImport\Model\Resource\Serialize\SerializeValueSerializer;
 use BigBridge\ProductImport\Model\Resource\Serialize\ValueSerializer;
 use Exception;
+use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\App\ProductMetadata;
+use Magento\Store\Model\ScopeInterface;
 
 /**
  * Pre-loads all meta data needed for the core processes once.
@@ -21,11 +26,11 @@ class MetaData
 {
     const ENTITY_TYPE_TABLE = 'eav_entity_type';
     const PRODUCT_ENTITY_TABLE = 'catalog_product_entity';
+    const WEEE_TABLE = 'weee_tax';
     const CATEGORY_ENTITY_TABLE = 'catalog_category_entity';
     const URL_REWRITE_TABLE = 'url_rewrite';
     const URL_REWRITE_PRODUCT_CATEGORY_TABLE = 'catalog_url_rewrite_product_category';
     const CATEGORY_PRODUCT_TABLE = 'catalog_category_product';
-    const CONFIG_DATA_TABLE = 'core_config_data';
     const ATTRIBUTE_SET_TABLE = 'eav_attribute_set';
     const ATTRIBUTE_TABLE = 'eav_attribute';
     const ATTRIBUTE_OPTION_TABLE = 'eav_attribute_option';
@@ -71,6 +76,9 @@ class MetaData
     /** @var  Magento2DbConnection */
     protected $db;
 
+    /** @var  ScopeConfigInterface */
+    protected $scopeConfig;
+
     /** @var string */
     public $magentoVersion;
 
@@ -84,6 +92,12 @@ class MetaData
     public $productEntityTable;
 
     /** @var string */
+    public $productEntityVarcharTable;
+
+    /** @var string */
+    public $weeeTable;
+
+    /** @var string */
     public $categoryEntityTable;
 
     /** @var string */
@@ -94,9 +108,6 @@ class MetaData
 
     /** @var string */
     public $categoryProductTable;
-
-    /** @var string */
-    public $configDataTable;
 
     /** @var string */
     public $productWebsiteTable;
@@ -264,10 +275,10 @@ class MetaData
     public $categoryAttributeMap;
 
     /** @var string */
-    public $productUrlSuffix;
+    public $productUrlSuffixes;
 
     /** @var string */
-    public $categoryUrlSuffix;
+    public $categoryUrlSuffixes;
 
     /** @var bool Create 301 rewrite for older url_rewrite entries */
     public $saveRewritesHistory;
@@ -278,15 +289,21 @@ class MetaData
     /** @var int[] */
     public $imageAttributeIds;
 
+    /** @var string */
+    public $weeeAttributeId;
+
     /**
      * MetaData constructor.
      *
      * @param Magento2DbConnection $db
      * @throws Exception
      */
-    public function __construct(Magento2DbConnection $db)
-    {
+    public function __construct(
+        Magento2DbConnection $db,
+        ScopeConfigInterface $scopeConfig
+    ) {
         $this->db = $db;
+        $this->scopeConfig = $scopeConfig;
 
         $this->loadTables();
         $this->reloadCache();
@@ -303,11 +320,12 @@ class MetaData
     {
         $this->entityTypeTable = $this->db->getFullTableName(self::ENTITY_TYPE_TABLE);
         $this->productEntityTable = $this->db->getFullTableName(self::PRODUCT_ENTITY_TABLE);
+        $this->productEntityVarcharTable = sprintf("%s_%s", $this->productEntityTable, EavAttributeInfo::TYPE_VARCHAR);
+        $this->weeeTable = $this->db->getFullTableName(self::WEEE_TABLE);
         $this->categoryEntityTable = $this->db->getFullTableName(self::CATEGORY_ENTITY_TABLE);
         $this->urlRewriteTable = $this->db->getFullTableName(self::URL_REWRITE_TABLE);
         $this->urlRewriteProductCategoryTable = $this->db->getFullTableName(self::URL_REWRITE_PRODUCT_CATEGORY_TABLE);
         $this->categoryProductTable = $this->db->getFullTableName(self::CATEGORY_PRODUCT_TABLE);
-        $this->configDataTable = $this->db->getFullTableName(self::CONFIG_DATA_TABLE);
         $this->productWebsiteTable = $this->db->getFullTableName(self::PRODUCT_WEBSITE_TABLE);
         $this->mediaGalleryTable = $this->db->getFullTableName(self::MEDIA_GALLERY_TABLE);
         $this->mediaGalleryValueToEntityTable = $this->db->getFullTableName(self::MEDIA_GALLERY_VALUE_TO_ENTITY_TABLE);
@@ -365,10 +383,6 @@ class MetaData
         $this->defaultCategoryAttributeSetId = $this->getDefaultCategoryAttributeSetId();
         $this->defaultProductAttributeSetId = $this->getDefaultProductAttributeSetId();
 
-        $this->productUrlSuffix = $this->getProductUrlSuffix();
-        $this->categoryUrlSuffix = $this->getCategoryUrlSuffix();
-        $this->saveRewritesHistory = $this->getSaveRewritesHistory();
-
         $this->storeViewMap = $this->getStoreViewMap();
         $this->storeViewWebsiteMap = $this->getStoreViewWebsiteMap();
         $this->websiteMap = $this->getWebsiteMap();
@@ -380,9 +394,18 @@ class MetaData
         $this->mediaGalleryAttributeId = $this->getMediaGalleryAttributeId();
         $this->productEavAttributeInfo = $this->getProductEavAttributeInfo();
         $this->imageAttributeIds = $this->getImageAttributeIds();
+        $this->weeeAttributeId = $this->getWeeeAttributeId();
+
+        $this->productUrlSuffixes = $this->getProductUrlSuffixes();
+        $this->categoryUrlSuffixes = $this->getCategoryUrlSuffixes();
+        $this->saveRewritesHistory = $this->getSaveRewritesHistory();
 
         if (version_compare($this->magentoVersion, "2.3.0") >= 0) {
             $this->sourceCodeMap = $this->getSourceCodeMap();
+        }
+
+        if (version_compare($this->magentoVersion, "2.4.0") >= 0) {
+            $this->setNewPriceDecimals();
         }
     }
 
@@ -397,19 +420,34 @@ class MetaData
         // $productMetadata = new \Magento\Framework\App\ProductMetadata();
         // $version = $productMetadata->getVersion();
         //
-        // But is takes 0.2 seconds to execute, this is too long
+        // But it takes up to 0.2 seconds to execute, this is too long
         // See also https://magento.stackexchange.com/questions/96858/how-to-get-magento-version-in-magento2-equivalent-of-magegetversion
+        //
+        // However, if magento/magento2-base is not deployed, it falls back to the official method
+        // See https://github.com/bigbridge-nl/product-import/issues/45
 
-        if (preg_match('/"version": "([^\"]+)"/',
-            file_get_contents(BP . '/vendor/magento/magento2-base/composer.json'), $matches)) {
+        $composerFile = BP . '/vendor/magento/magento2-base/composer.json';
 
+        if (!file_exists($composerFile)) {
+            $productMetadata = ObjectManager::getInstance()->get(ProductMetadata::class);
+            $magentoVersion = $productMetadata->getVersion();
+        } else if (preg_match('/"version": "([^\"]+)"/',
+            file_get_contents($composerFile), $matches)) {
             $magentoVersion = $matches[1];
-
         } else {
             throw new Exception("Magento version could not be detected.");
         }
 
         return $magentoVersion;
+    }
+
+    protected function setNewPriceDecimals()
+    {
+        Decimal::$decimalPriceFormat = Decimal::DECIMAL_20_6_FORMAT;
+        Decimal::$decimalPricePattern = Decimal::DECIMAL_20_6_PATTERN;
+
+        Decimal::$decimalEavFormat = Decimal::DECIMAL_20_6_FORMAT;
+        Decimal::$decimalEavPattern = Decimal::DECIMAL_20_6_PATTERN;
     }
 
     protected function getValueSerializer()
@@ -523,6 +561,10 @@ class MetaData
 
     protected function getSourceCodeMap()
     {
+        if (!$this->db->fetchSingleCell("SHOW TABLES LIKE '{$this->sourceTable}'")) {
+            return [];
+        }
+
         return $this->db->fetchMap("SELECT `source_code`, `source_code` FROM {$this->sourceTable}");
     }
 
@@ -576,7 +618,7 @@ class MetaData
     protected function getProductEavAttributeInfo()
     {
         $rows = $this->db->fetchAllAssoc("
-            SELECT A.`attribute_id`, A.`attribute_code`, A.`is_required`, A.`backend_type`, A.`frontend_input`, C.`is_global` 
+            SELECT A.`attribute_id`, A.`attribute_code`, A.`is_required`, A.`backend_type`, A.`frontend_input`, C.`is_global`
             FROM {$this->attributeTable} A
             INNER JOIN {$this->catalogAttributeTable} C ON C.`attribute_id` = A.`attribute_id`
             WHERE A.`entity_type_id` = ? AND A.backend_type != 'static'
@@ -610,13 +652,28 @@ class MetaData
         ];
     }
 
+    /**
+     * @return string|null
+     */
+    protected function getWeeeAttributeId()
+    {
+        return $this->db->fetchSingleCell("
+            SELECT A.`attribute_id`
+            FROM {$this->attributeTable} A
+            INNER JOIN {$this->catalogAttributeTable} C ON C.`attribute_id` = A.`attribute_id`
+            WHERE A.`entity_type_id` = ? AND A.frontend_input = 'weee'
+         ", [
+            $this->productEntityTypeId
+        ]);
+    }
+
     protected function getMediaGalleryAttributeId()
     {
         $attributeTable = $this->db->getFullTableName(self::ATTRIBUTE_TABLE);
 
         return $this->db->fetchSingleCell("
-            SELECT `attribute_id` 
-            FROM {$attributeTable} 
+            SELECT `attribute_id`
+            FROM {$attributeTable}
             WHERE `entity_type_id` = ? AND attribute_code = 'media_gallery'
         ", [
             $this->productEntityTypeId
@@ -624,46 +681,41 @@ class MetaData
 
     }
 
-    protected function getCategoryUrlSuffix()
+    protected function getProductUrlSuffixes()
     {
-        $value = $this->db->fetchSingleCell("
-            SELECT `value`
-            FROM `{$this->configDataTable}`
-            WHERE
-                `scope` = 'default' AND
-                `scope_id` = 0 AND
-                `path` = 'catalog/seo/category_url_suffix'
-        ");
+        $suffixes = [];
+        foreach ($this->storeViewMap as $storeViewId) {
+            $suffixes[$storeViewId] = $this->scopeConfig->getValue(
+                'catalog/seo/product_url_suffix',
+                ScopeInterface::SCOPE_STORES,
+                $storeViewId
+            );
+        }
 
-        return is_null($value) ? ".html" : $value;
+        return $suffixes;
+    }
+
+    protected function getCategoryUrlSuffixes()
+    {
+        $suffixes = [];
+        foreach ($this->storeViewMap as $storeViewId) {
+            $suffixes[$storeViewId] = $this->scopeConfig->getValue(
+                'catalog/seo/category_url_suffix',
+                ScopeInterface::SCOPE_STORES,
+                $storeViewId
+            );
+        }
+
+        return $suffixes;
     }
 
     protected function getSaveRewritesHistory()
     {
-        $value = $this->db->fetchSingleCell("
-            SELECT `value`
-            FROM `{$this->configDataTable}`
-            WHERE
-                `scope` = 'default' AND
-                `scope_id` = 0 AND
-                `path` = 'catalog/seo/save_rewrites_history'
-        ");
+        $value = $this->scopeConfig->getValue(
+            'catalog/seo/save_rewrites_history'
+        );
 
         return is_null($value) ? true : (bool)$value;
-    }
-
-    protected function getProductUrlSuffix()
-    {
-        $value = $this->db->fetchSingleCell("
-            SELECT `value`
-            FROM `{$this->configDataTable}`
-            WHERE
-                `scope` = 'default' AND
-                `scope_id` = 0 AND
-                `path` = 'catalog/seo/product_url_suffix'
-        ");
-
-        return is_null($value) ? ".html" : $value;
     }
 
     protected function getLinkInfo()

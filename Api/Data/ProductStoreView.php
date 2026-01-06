@@ -36,6 +36,7 @@ class ProductStoreView
 
     const ATTR_VISIBILITY = 'visibility';
     const ATTR_URL_KEY = 'url_key';
+    const ATTR_URL_PATH = 'url_path';
     const ATTR_TAX_CLASS_ID = 'tax_class_id';
     const ATTR_PRICE = 'price';
     const ATTR_COST = 'cost';
@@ -103,7 +104,7 @@ class ProductStoreView
     /** @var CustomOptionValue[][] */
     protected $customOptionValues = [];
 
-    public function setName(string $name = null)
+    public function setName(?string $name = null)
     {
         $this->attributes[self::ATTR_NAME] = ($name === null) ? null : trim($name);
     }
@@ -136,7 +137,7 @@ class ProductStoreView
      *
      * @param int|null $status
      */
-    public function setStatus(int $status = null)
+    public function setStatus(?int $status = null)
     {
         $this->attributes[self::ATTR_STATUS] = $status;
     }
@@ -146,52 +147,52 @@ class ProductStoreView
      *
      * @param int|null $available
      */
-    public function setGiftMessageAvailable(int $available = null)
+    public function setGiftMessageAvailable(?int $available = null)
     {
         $this->attributes[self::ATTR_GIFT_MESSAGE_AVAILABLE] = $available;
     }
 
-    public function setDescription(string $description = null)
+    public function setDescription(?string $description = null)
     {
         // textarea input: not trimmed
         $this->attributes[self::ATTR_DESCRIPTION] = $description;
     }
 
-    public function setShortDescription(string $shortDescription = null)
+    public function setShortDescription(?string $shortDescription = null)
     {
         // textarea input: not trimmed
         $this->attributes[self::ATTR_SHORT_DESCRIPTION] = $shortDescription;
     }
 
-    public function setMetaTitle(string $metaTitle = null)
+    public function setMetaTitle(?string $metaTitle = null)
     {
         $this->attributes[self::ATTR_META_TITLE] = ($metaTitle === null) ? null : trim($metaTitle);
     }
 
-    public function setMetaDescription(string $metaDescription = null)
+    public function setMetaDescription(?string $metaDescription = null)
     {
         // textarea input: not trimmed
         $this->attributes[self::ATTR_META_DESCRIPTION] = $metaDescription;
     }
 
-    public function setMetaKeywords(string $metaKeywords = null)
+    public function setMetaKeywords(?string $metaKeywords = null)
     {
         // textarea input: not trimmed
         $this->attributes[self::ATTR_META_KEYWORDS] = $metaKeywords;
     }
 
     /**
-     * @param string|null $price A 12.4 decimal field
+     * @param string|null $price A 12.4 / 20.6 decimal field
      */
-    public function setPrice(string $price = null)
+    public function setPrice(?string $price = null)
     {
-        $this->attributes[self::ATTR_PRICE] = Decimal::format($price);
+        $this->attributes[self::ATTR_PRICE] = Decimal::formatPrice($price);
     }
 
     /**
      * @param string|null $cost A 12.4 decimal field
      */
-    public function setCost(string $cost = null)
+    public function setCost(?string $cost = null)
     {
         $this->attributes[self::ATTR_COST] = Decimal::format($cost);
     }
@@ -199,7 +200,7 @@ class ProductStoreView
     /**
      * @param string|null $msrp Manufacturer Suggested Retail Price. A 12.4 decimal field
      */
-    public function setMsrp(string $msrp = null)
+    public function setMsrp(?string $msrp = null)
     {
         $this->attributes[self::ATTR_MSRP] = Decimal::format($msrp);
     }
@@ -209,7 +210,7 @@ class ProductStoreView
      *
      * @param int|null $type
      */
-    public function setMsrpDisplayActualPriceType(int $type = null)
+    public function setMsrpDisplayActualPriceType(?int $type = null)
     {
         $this->attributes[self::ATTR_MSRP_DISPLAY_ACTUAL_PRICE_TYPE] = $type;
     }
@@ -219,22 +220,22 @@ class ProductStoreView
      *
      * @param int|null $visibility
      */
-    public function setVisibility(int $visibility = null)
+    public function setVisibility(?int $visibility = null)
     {
         $this->attributes[self::ATTR_VISIBILITY] = $visibility;
     }
 
-    public function setTaxClassId(int $taxClassId = null)
+    public function setTaxClassId(?int $taxClassId = null)
     {
         $this->attributes[self::ATTR_TAX_CLASS_ID] = $taxClassId;
     }
 
-    public function setTaxClassName(string $taxClassName = null)
+    public function setTaxClassName(?string $taxClassName = null)
     {
         $this->unresolvedAttributes[self::ATTR_TAX_CLASS_ID] = ($taxClassName === null) ? null : trim($taxClassName);
     }
 
-    public function setUrlKey(string $urlKey = null)
+    public function setUrlKey(?string $urlKey = null)
     {
         $this->attributes[self::ATTR_URL_KEY] = ($urlKey === null) ? null : trim($urlKey);
     }
@@ -255,7 +256,7 @@ class ProductStoreView
     /**
      * @param string|null $weight A 12.4 decimal field
      */
-    public function setWeight(string $weight = null)
+    public function setWeight(?string $weight = null)
     {
         $this->attributes[self::ATTR_WEIGHT] = Decimal::format($weight);
     }
@@ -263,15 +264,15 @@ class ProductStoreView
     /**
      * @param string|null $specialPrice A 12.4 decimal field
      */
-    public function setSpecialPrice(string $specialPrice = null)
+    public function setSpecialPrice(?string $specialPrice = null)
     {
-        $this->attributes[self::ATTR_SPECIAL_PRICE] = Decimal::format($specialPrice);
+        $this->attributes[self::ATTR_SPECIAL_PRICE] = Decimal::formatPrice($specialPrice);
     }
 
     /**
      * @param string|null $specialPriceFromDate A y-m-d MySql date
      */
-    public function setSpecialFromDate(string $specialPriceFromDate = null)
+    public function setSpecialFromDate(?string $specialPriceFromDate = null)
     {
         $this->attributes[self::ATTR_SPECIAL_FROM_DATE] = ($specialPriceFromDate === null) ? null : trim($specialPriceFromDate);
     }
@@ -279,7 +280,7 @@ class ProductStoreView
     /**
      * @param string|null $specialPriceToDate A y-m-d MySql date
      */
-    public function setSpecialToDate(string $specialPriceToDate = null)
+    public function setSpecialToDate(?string $specialPriceToDate = null)
     {
         $this->attributes[self::ATTR_SPECIAL_TO_DATE] = ($specialPriceToDate === null) ? null : trim($specialPriceToDate);
     }
@@ -287,7 +288,7 @@ class ProductStoreView
     /**
      * @param string|null $newsFromDate A y-m-d MySql date
      */
-    public function setNewsFromDate(string $newsFromDate = null)
+    public function setNewsFromDate(?string $newsFromDate = null)
     {
         $this->attributes[self::ATTR_NEWS_FROM_DATE] = ($newsFromDate === null) ? null : trim($newsFromDate);
     }
@@ -295,7 +296,7 @@ class ProductStoreView
     /**
      * @param string|null $newsToDate A y-m-d MySql date
      */
-    public function setNewsToDate(string $newsToDate = null)
+    public function setNewsToDate(?string $newsToDate = null)
     {
         $this->attributes[self::ATTR_NEWS_TO_DATE] = ($newsToDate === null) ? null : trim($newsToDate);
     }
@@ -303,7 +304,7 @@ class ProductStoreView
     /**
      * @param string|null $option The admin name of the manufacturer attribute option
      */
-    public function setManufacturer(string $option = null)
+    public function setManufacturer(?string $option = null)
     {
         $this->unresolvedSelects[self::ATTR_MANUFACTURER] = ($option === null) ? null : trim($option);
     }
@@ -311,7 +312,7 @@ class ProductStoreView
     /**
      * @param string|null $countryCode 2 characters, uppercase
      */
-    public function setCountryOfManufacture(string $countryCode = null)
+    public function setCountryOfManufacture(?string $countryCode = null)
     {
         $this->attributes[self::ATTR_COUNTRY_OF_MANUFACTURE] = ($countryCode === null) ? null : trim($countryCode);
     }
@@ -319,7 +320,7 @@ class ProductStoreView
     /**
      * @param string|null $option The admin name of the color attribute option
      */
-    public function setColor(string $option = null)
+    public function setColor(?string $option = null)
     {
         $this->unresolvedSelects[self::ATTR_COLOR] = ($option === null) ? null : trim($option);
     }
@@ -331,7 +332,7 @@ class ProductStoreView
      * @param string $attributeCode
      * @param string|null $value
      */
-    public function setCustomAttribute(string $attributeCode, string $value = null)
+    public function setCustomAttribute(string $attributeCode, ?string $value = null)
     {
         // value is not trimmed, because it may have textarea as input, or it may be null
         $this->attributes[trim($attributeCode)] = $value;
@@ -426,7 +427,7 @@ class ProductStoreView
      * @param string $attributeCode
      * @param string $option The admin name of the attribute option
      */
-    public function setSelectAttribute(string $attributeCode, string $option = null)
+    public function setSelectAttribute(string $attributeCode, ?string $option = null)
     {
         $this->unresolvedSelects[trim($attributeCode)] = ($option === null) ? null : trim($option);
     }
@@ -440,12 +441,12 @@ class ProductStoreView
      * @param string $attributeCode
      * @param array $options The admin names of the attribute options
      */
-    public function setMultipleSelectAttribute(string $attributeCode, array $options = null)
+    public function setMultipleSelectAttribute(string $attributeCode, ?array $options = null)
     {
         $this->unresolvedMultipleSelects[trim($attributeCode)] = ($options === null) ? null : array_map('trim', $options);
     }
 
-    public function setMultiSelectAttributeOptionIds(string $attributeCode, array $optionIds = null)
+    public function setMultiSelectAttributeOptionIds(string $attributeCode, ?array $optionIds = null)
     {
         $this->attributes[$attributeCode] = ($optionIds === null) ? null : implode(',', array_map('trim', $optionIds));
     }
@@ -456,7 +457,7 @@ class ProductStoreView
      */
     public function setCustomOptionTitle(CustomOption $customOption, string $title)
     {
-        $this->customOptionTitles[] = new CustomOptionTitle($customOption, $title);
+        $this->customOptionTitles[] = new CustomOptionTitle($customOption, trim($title));
     }
 
     /**
@@ -466,7 +467,7 @@ class ProductStoreView
      */
     public function setCustomOptionPrice(CustomOption $customOption, string $price, string $priceType)
     {
-        $this->customOptionPrices[] = new CustomOptionPrice($customOption, $price, $priceType);
+        $this->customOptionPrices[] = new CustomOptionPrice($customOption, trim($price), trim($priceType));
     }
 
     /**

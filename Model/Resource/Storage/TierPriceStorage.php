@@ -3,6 +3,7 @@
 namespace BigBridge\ProductImport\Model\Resource\Storage;
 
 use BigBridge\ProductImport\Api\Data\Product;
+use BigBridge\ProductImport\Helper\Decimal;
 use BigBridge\ProductImport\Model\Persistence\Magento2DbConnection;
 use BigBridge\ProductImport\Model\Resource\MetaData;
 
@@ -90,6 +91,8 @@ class TierPriceStorage
     {
         $values = [];
 
+        $magento22 = (version_compare($this->metaData->magentoVersion, "2.2.0") >= 0);
+
         foreach ($products as $product) {
 
             $tierPrices = $product->getTierPrices();
@@ -104,12 +107,27 @@ class TierPriceStorage
                     $values[] = $tierPrice->getQuantity();
                     $values[] = $tierPrice->getValue();
                     $values[] = $tierPrice->getWebsiteId();
+                    if ($magento22) {
+                        $values[] = $tierPrice->getPercentageValue();
+                    }
                 }
             }
         }
 
-        $this->db->insertMultipleWithUpdate($this->metaData->tierPriceTable, ['entity_id', 'all_groups', 'customer_group_id', 'qty', 'value', 'website_id'], $values,
-            Magento2DbConnection::_1_KB, "`value` = VALUES(`value`)");
+        $fields = [
+            'entity_id',
+            'all_groups',
+            'customer_group_id',
+            'qty',
+            'value',
+            'website_id'
+        ];
+        if ($magento22) {
+            $fields[] = 'percentage_value';
+        }
+
+        $this->db->insertMultipleWithUpdate($this->metaData->tierPriceTable,
+            $fields, $values,Magento2DbConnection::_1_KB, "`value` = VALUES(`value`)");
     }
 
     /**
@@ -125,11 +143,21 @@ class TierPriceStorage
 
         // collect tier prices that are stored in the database
         $storedTierPriceData = $this->db->fetchAllAssoc("
-            SELECT `value_id`, `entity_id`, `all_groups`, `customer_group_id`, `qty`, `value`, `website_id`,
-                CONCAT_WS(' ', `entity_id`, `all_groups`, `customer_group_id`, `qty`, `value`, `website_id`) as serialized
+            SELECT `value_id`, `entity_id`, `all_groups`, `customer_group_id`, `qty`, `value`, `website_id`
             FROM `{$this->metaData->tierPriceTable}`
             WHERE `entity_id` IN (" . $this->db->getMarks($productIds) . ")
         ", $productIds);
+
+        foreach ($storedTierPriceData as &$storedTierPriceDatum) {
+            $storedTierPriceDatum['serialized'] = sprintf("%s %s %s %s %s %s",
+                $storedTierPriceDatum['entity_id'],
+                (int)$storedTierPriceDatum['all_groups'],
+                (int)$storedTierPriceDatum['customer_group_id'],
+                Decimal::format($storedTierPriceDatum['qty']),
+                Decimal::formatPrice($storedTierPriceDatum['value']),
+                (int)$storedTierPriceDatum['website_id']
+            );
+        }
 
         // serialize current tier prices
         $activeTierPriceData = [];

@@ -3,6 +3,7 @@
 namespace BigBridge\ProductImport\Model\Resource\Storage;
 
 use BigBridge\ProductImport\Api\Data\ProductStoreView;
+use BigBridge\ProductImport\Model\Data\CategoryInfo;
 use BigBridge\ProductImport\Model\Data\UrlRewrite;
 use BigBridge\ProductImport\Model\Persistence\Magento2DbConnection;
 use BigBridge\ProductImport\Model\Resource\MetaData;
@@ -269,7 +270,11 @@ class UrlRewriteStorage
         $inserts = array_diff_key($newRewrites, $oldRewrites);
         $deletes = array_diff_key($oldRewrites, $newRewrites);
 
-        return [$deletes, $inserts];
+        if (count($inserts) == 0 && count($deletes) == 0) {
+            return [[], []];
+        }
+
+        return [$oldRewrites, $newRewrites];
     }
 
     /**
@@ -301,7 +306,11 @@ class UrlRewriteStorage
         $currentZeroRewrite = new UrlRewrite(null, $productId, $requestPath, $targetPath,
             self::NO_REDIRECT, $storeViewId, $categoryId, true, $categoryId);
 
-        $newRewrites = [];
+        // add the active non-redirect up front
+        $newRewrites = [
+            $currentZeroRewrite->getKey() => $currentZeroRewrite
+        ];
+
         /** @var UrlRewrite $existingZeroRewrite */
         $existingZeroRewrite = null;
         if (isset($existingUrlRewrites[$categoryId])) {
@@ -337,9 +346,6 @@ class UrlRewriteStorage
             }
         }
 
-        // add the active non-redirect
-        $newRewrites[$currentZeroRewrite->getKey()] = $currentZeroRewrite;
-
         return $newRewrites;
     }
 
@@ -368,8 +374,10 @@ class UrlRewriteStorage
 
         foreach ($categoryIds as $categoryId) {
             $categoryInfo = $this->categoryImporter->getCategoryInfo($categoryId);
-            $categoriesWithUrlKeysIds = array_slice($categoryInfo->path, 2);
-            $parentCategories = array_merge($parentCategories, $categoriesWithUrlKeysIds);
+            if ($categoryInfo instanceof CategoryInfo) {
+                $categoriesWithUrlKeysIds = array_slice($categoryInfo->path, 2);
+                $parentCategories = array_merge($parentCategories, $categoriesWithUrlKeysIds);
+            }
         }
 
         return array_unique($parentCategories);
@@ -425,7 +433,9 @@ class UrlRewriteStorage
 
         $pieces[] = $productUrlKey;
 
-        return implode('/', $pieces) . $this->metaData->productUrlSuffix;
+        $suffix = $this->metaData->productUrlSuffixes[$storeViewId];
+
+        return implode('/', $pieces) . $suffix;
     }
 
     /**
@@ -489,7 +499,7 @@ class UrlRewriteStorage
             // perform the REPLACE INTO url_rewrite
             $values = [];
             foreach ($replacingUrlRewrites as $urlRewrite) {
-                $values[] = $urlRewrite->getUrlRewriteId();
+                $values[] = 0;
                 $values[] = 'product';
                 $values[] = $urlRewrite->getProductId();
                 $values[] = $urlRewrite->getRequestPath();

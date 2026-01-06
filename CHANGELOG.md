@@ -1,6 +1,111 @@
 # Changelog
 
-## 1.3.1 : Speed optimization for stock
+# 1.7.4 : Simplify access to core config data 
+
+Pull request by Pieter Hoste, rewrites code that was optimized without need and which also lacked features. 
+
+# 1.7.3 : Reopen a closed MySQL connection
+
+Pull request by Pieter Hoste, reopens a MySQL connection that was closed due to inactivity.
+
+# 1.7.2 : Use official Magento version detection when magento/magento2-base is not available
+
+As mentioned by Pieter Hoste, magento/magento2-base may not be available; in this case the official version detection will now be used.
+
+# 1.7.1 : More robust when handling non-existing categories.
+
+Stronger getCategoryInfo check when fetching parent categories. Pull request by Duckↄhip.
+
+# 1.7.0 : Support for M2EPro
+
+An option to notify the extension M2EPro of changes to products.
+
+# 1.6.2 : Remove cached images
+
+In image-set-mode cached images were not removed when a new image was uploaded with the same name. They are now.
+
+# 1.6.1 : Fix remove temporary images in force-download mode
+
+In the (default) mode where images are re-downloaded each import, the images were left in the temporary directory (even though they were not used again). This is now no longer the case. The images are removed after the import.  
+
+## 1.6.0 : Flat type category url paths
+
+* An option, requested by Chris Astley, to create simple url_path attributes for generated categories (i.e 'corner-chairs' instead of the standard 'furniture/tables/corner-chairs'). This extends to the url_rewrite entry as well. 
+
+## 1.5.4 : Fix url rewrites problem
+
+* The attribute `url_path`, if exists, is removed from the imported products
+* Writes non-redirects (redirect_type = 0) before redirects (redirect_type = 301) in url_rewrite, because Magento relies on this order when it creates canonical urls and such.
+
+## 1.5.3 : Added missing options
+
+Added some options that were missing from the cli command and the rest api.
+
+## 1.5.2 : Support for Magento 2.4
+
+Support for 20.6 price decimal format.
+
+Fixed import of tier prices in M2.4
+
+## 1.5.1 : Fix XSD for multiple store views
+
+The XSD that validates the product import XML did not allow multiple store views. 
+
+## 1.5.0 : An option to have old category links removed
+
+Guus Portegies asked for this option to have product-to-category links to be removed as well as added.
+
+Setting `$config->categoryStrategy = ImportConfig::CATEGORY_STRATEGY_SET` will remove product-to-category links that are not named in the import.
+
+Use responsively; the documentation explains when this is not a good idea. 
+
+## 1.4.6 : url suffix per website
+
+Take into account that product and category url suffix may differ per website.
+
+## 1.4.5 : url suffix per store view
+
+Take into account that product and category url suffix may differ per store view.
+
+## 1.4.4 : Support for two added columns since M2.2 
+
+lucafuse94 noticed that parent_product_id was missing from catalog_product_bundle_option_value. 
+
+Started monitoring database changes between Magento versions, using Compalex. Added support for 
+
+* Tier prices, percentage_value (since M2.2)
+* Bundled product option value, parent_product_id (since M2.2)
+
+Magento 2.3 only added MSI, and did not change the existing product tables.
+
+## 1.4.3 : Sku case sensitive
+
+SKU's are explicitly made case sensitive
+Added a function to look up the case sensitive sku in the database.
+
+## 1.4.2 : Fix category level
+
+choleaoum noticed that the level field of created categories was one too high.
+Also some missing trim()'s were added to clean input.  
+
+## 1.4.1 : Fix category url_rewrite
+
+The category entries for generated categories had 0 as store_id. Changed this to the ids of actual stores views.
+
+## 1.4.0 : Weee tax
+
+Pull request by Jessica Garcia Santana
+
+- Support for import of a single custom weee attribute (Waste Electrical and Electronic Equipment taxes)
+
+## 1.3.2 : Validation for compound members / default url suffix - 01-11-2019
+
+- Importer now invalidates compound products (configurable, bundle, group) when one of its members has errors.
+- Fixed missing price in test file a-configurable.xml
+- Configurable product super attribute check now allows attributes with frontend_input 'boolean'
+- Product url suffix and category url suffix no longer default to '.html' when there is no value in core_config_data, in stead the value from config.xml is taken
+
+## 1.3.1 : Speed optimization for stock - 09-12-2018
 
 Speed optimizations:
 

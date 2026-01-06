@@ -94,6 +94,10 @@ The library provides these possibilities for url_keys:
 * based on sku
 * based on sku (on conflict, add a serial number).
 
+## url_path
+
+The `url_path` property of products serves no purpose, but it does cause problems. Magento still uses it to check if the url_key has changed. Therefore it's best to remove it when updating the url key.  
+
 ## Names and ids
 
 For imports and exports it is customary to use human readable names for attributes. "visibility" for example is exported by Magento's exporter as "Catalog, Search". The internal value is 4.
@@ -200,6 +204,14 @@ On conflicts:
 
 The table catalog_url_rewrite_product_category is rarely used by Magento, but where it is, it is joined to url_rewrite in order to efficiently put a restriction on a category,
 since url_rewrite's category information is encoded in the metadata field.
+
+Note: entries with redirect_type = 0 must be written to the database before entries with redirect_type = 301, because Magento relies on this order.
+
+https://github.com/magento/magento2/blob/2.4-develop/app/code/Magento/Catalog/Model/Product/Url.php
+
+A `$filterData['redirect_type'] = 0` is missing here.
+
+This means that all rewrites must be removed and re-added, whenever a url rewrite changes.
 
 ## Nice to know
 

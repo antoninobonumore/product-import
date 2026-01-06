@@ -17,6 +17,7 @@ abstract class Product
     const CATEGORY_IDS = 'category_ids';
     const ATTRIBUTE_SET_ID = 'attribute_set_id';
     const WEBSITE_IDS = 'website_ids';
+    const WEEE_ATTRIBUTE = 'weee';
 
     /** @var  int */
     public $id;
@@ -27,8 +28,8 @@ abstract class Product
     /** @var  string 64 character */
     protected $sku;
 
-    /** @var int[] */
-    protected $category_ids = [];
+    /** @var int[]|null */
+    protected $category_ids = null;
 
     /** @var array */
     protected $website_ids = [];
@@ -54,10 +55,18 @@ abstract class Product
     /** @var TierPrice[]|null An array of tier prices. null means: not used in this import */
     protected $tierPrices = null;
 
+    /** @var Weee[]|null  */
+    protected $weees = null;
+
     /** @var CustomOption[]|null */
     protected $customOptions = null;
 
-    /** @var array */
+    /**
+     * Attributes whose value is a name or code, in stead of the final value.
+     * These attributes need to be resolved first.
+     *
+     * @var array
+     */
     protected $unresolvedAttributes = [];
 
     // =========================================
@@ -217,11 +226,11 @@ abstract class Product
 
     public function addCategoryIds(array $categoryIds)
     {
-        $this->category_ids = $categoryIds;
+        $this->category_ids = array_map('trim', $categoryIds);
     }
 
     /**
-     * @return int[]
+     * @return int[]|null
      */
     public function getCategoryIds()
     {
@@ -233,7 +242,7 @@ abstract class Product
      */
     public function addCategoriesByGlobalName(array $categoryNames)
     {
-        $this->unresolvedAttributes[self::CATEGORY_IDS] = $categoryNames;
+        $this->unresolvedAttributes[self::CATEGORY_IDS] = array_map('trim', $categoryNames);
     }
 
     public function setAttributeSetId(int $attributeSetId)
@@ -259,12 +268,28 @@ abstract class Product
      */
     public function setAttributeSetByName(string $attributeSetName)
     {
-        $this->unresolvedAttributes[self::ATTRIBUTE_SET_ID] = $attributeSetName;
+        $this->unresolvedAttributes[self::ATTRIBUTE_SET_ID] = trim($attributeSetName);
     }
 
     public function setWebsitesByCode(array $websiteCodes)
     {
-        $this->unresolvedAttributes[self::WEBSITE_IDS] = $websiteCodes;
+        $this->unresolvedAttributes[self::WEBSITE_IDS] = array_map('trim', $websiteCodes);
+    }
+
+    /**
+     * @param array $weees
+     */
+    public function setWeees(array $weees)
+    {
+        $this->weees = $weees;
+    }
+
+    /**
+     * @return Weee[]|null
+     */
+    public function getWeees()
+    {
+        return $this->weees;
     }
 
     /**
@@ -272,7 +297,7 @@ abstract class Product
      */
     public function setWebsitesIds(array $websiteIds)
     {
-        $this->website_ids = $websiteIds;
+        $this->website_ids = array_map('trim', $websiteIds);
     }
 
     /**

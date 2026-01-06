@@ -17,6 +17,7 @@ use BigBridge\ProductImport\Model\Resource\MetaData;
 class ImageStorage
 {
     const PRODUCT_IMAGE_PATH = BP . "/pub/media/catalog/product";
+    const PRODUCT_CACHE_PATH = BP . "/pub/media/catalog/product/cache";
 
     const URL_PATTERN = '#^(http://|https://|//)#i';
 
@@ -185,17 +186,18 @@ class ImageStorage
     /**
      * @param Product[] $products
      * @param bool $removeObsoleteImages
+     * @param bool $removeTemporaryImages
      */
-    public function storeProductImages(array $products, bool $removeObsoleteImages)
+    public function storeProductImages(array $products, bool $removeObsoleteImages, bool $removeTemporaryImages)
     {
         foreach ($products as $product) {
-            $this->storeImages($product, $removeObsoleteImages);
+            $this->storeImages($product, $removeObsoleteImages, $removeTemporaryImages);
         }
 
         $this->insertImageRoles($products);
     }
 
-    protected function storeImages(Product $product, bool $removeObsoleteImages)
+    protected function storeImages(Product $product, bool $removeObsoleteImages, bool $removeTemporaryImages)
     {
         // important! if no images are specified, do not remove all images
         if (empty($product->getImages())) {
@@ -228,6 +230,25 @@ class ImageStorage
             foreach ($storeView->getImageGalleryInformation() as $imageGalleryInformation) {
                 $this->upsertImageGalleryInformation($product->id, $storeView->getStoreViewId(), $imageGalleryInformation);
             }
+        }
+
+        // remove temporary images
+        if ($removeTemporaryImages) {
+            $this->removeTemporaryImages($product);
+        }
+    }
+
+    protected function removeTemporaryImages(Product $product)
+    {
+        foreach ($product->getImages() as $image) {
+            @unlink($image->getTemporaryStoragePath());
+        }
+    }
+
+    protected function emptyCache(string $storagePath)
+    {
+        foreach (glob(self::PRODUCT_CACHE_PATH . "/*/" . $storagePath) as $filePath) {
+            @unlink($filePath);
         }
     }
 
@@ -291,8 +312,10 @@ class ImageStorage
                 // note! this only checks if the image has a role in a product, not if it is used in a gallery
                 // the real check would be too slow
                 if ($usageCount == 0) {
-                    // remove from file system
+                    // remove original
                     @unlink(self::PRODUCT_IMAGE_PATH . $storagePath);
+                    // removed resized caches
+                    $this->emptyCache($storagePath);
                 }
 
             }
@@ -420,7 +443,10 @@ class ImageStorage
             // only if the file is different in content will the old file be removed
             if (!$this->filesAreEqual($targetPath, $image->getTemporaryStoragePath())) {
 
+                // remove original
                 unlink($targetPath);
+                // removed resized caches
+                $this->emptyCache($image->getActualStoragePath());
 
                 // link image from its temporary position to its final position
                 link($image->getTemporaryStoragePath(), $targetPath);

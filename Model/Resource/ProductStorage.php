@@ -7,6 +7,7 @@ use BigBridge\ProductImport\Api\Data\ConfigurableProduct;
 use BigBridge\ProductImport\Api\Data\DownloadableProduct;
 use BigBridge\ProductImport\Api\Data\GroupedProduct;
 use BigBridge\ProductImport\Api\Data\Product;
+use BigBridge\ProductImport\Api\Data\SimpleProduct;
 use BigBridge\ProductImport\Model\Persistence\Magento2DbConnection;
 use BigBridge\ProductImport\Api\ImportConfig;
 use BigBridge\ProductImport\Model\Resource\Resolver\ReferenceResolver;
@@ -23,6 +24,8 @@ use BigBridge\ProductImport\Model\Resource\Storage\SourceItemStorage;
 use BigBridge\ProductImport\Model\Resource\Storage\StockItemStorage;
 use BigBridge\ProductImport\Model\Resource\Storage\TierPriceStorage;
 use BigBridge\ProductImport\Model\Resource\Storage\UrlRewriteStorage;
+use BigBridge\ProductImport\Model\Resource\Storage\WeeeStorage;
+use BigBridge\ProductImport\Model\Resource\ThirdParty\M2EProNotification;
 use BigBridge\ProductImport\Model\Resource\Validation\Validator;
 use Exception;
 
@@ -70,6 +73,9 @@ class ProductStorage
     /** @var CustomOptionStorage */
     protected $customOptionStorage;
 
+    /** @var WeeeStorage */
+    protected $weeeStorage;
+
     /** @var DownloadableStorage */
     protected $downloadableStorage;
 
@@ -85,6 +91,9 @@ class ProductStorage
     /** @var ProductTypeChanger */
     protected $productTypeChanger;
 
+    /** @var M2EProNotification */
+    protected $m2EProNotification;
+
     public function __construct(
         Magento2DbConnection $db,
         MetaData $metaData,
@@ -99,10 +108,12 @@ class ProductStorage
         StockItemStorage $stockItemStorage,
         SourceItemStorage $sourceItemStorage,
         CustomOptionStorage $customOptionStorage,
+        WeeeStorage $weeeStorage,
         DownloadableStorage $downloadableStorage,
         ConfigurableStorage $configurableStorage,
         BundleStorage $bundleStorage,
         GroupedStorage $groupedStorage,
+        M2EProNotification $m2EProNotification,
         ProductTypeChanger $productTypeChanger)
     {
         $this->db = $db;
@@ -118,11 +129,13 @@ class ProductStorage
         $this->stockItemStorage = $stockItemStorage;
         $this->sourceItemStorage = $sourceItemStorage;
         $this->customOptionStorage = $customOptionStorage;
+        $this->weeeStorage = $weeeStorage;
         $this->downloadableStorage = $downloadableStorage;
         $this->configurableStorage = $configurableStorage;
         $this->bundleStorage = $bundleStorage;
         $this->groupedStorage = $groupedStorage;
         $this->productTypeChanger = $productTypeChanger;
+        $this->m2EProNotification = $m2EProNotification;
     }
 
     /**
@@ -190,15 +203,27 @@ class ProductStorage
         // collect all images in temporary local directory; changes $product->errors
         $this->imageStorage->moveImagesToTemporaryLocation($products, $config);
 
-        $validProducts = [];
+        $almostValidProducts = [];
         foreach ($products as $product) {
 
             // checks all attributes, changes $product->errors
             $this->validator->validate($product);
 
             if ($product->isOk()) {
-                $validProducts[] = $product;
+                $almostValidProducts[] = $product;
             }
+        }
+
+        // compound product specific validation (must be done after all members have been evaluated)
+        $validProducts = [];
+        foreach ($almostValidProducts as $product) {
+            if (!($product instanceof SimpleProduct)) {
+                $this->validator->validateCompound($product, $products);
+                if (!$product->isOk()) {
+                    continue;
+                }
+            }
+            $validProducts[] = $product;
         }
 
         return $validProducts;
@@ -293,6 +318,8 @@ class ProductStorage
 
         $this->referenceResolver->resolveProductReferences($validProducts);
 
+        $this->productEntityStorage->removeUrlPaths($validProducts);
+
         foreach ($deleteAttributes as $eavAttribute => $storeViews) {
             $this->productEntityStorage->removeEavAttribute($storeViews, $eavAttribute);
         }
@@ -302,12 +329,20 @@ class ProductStorage
         }
 
         $this->customOptionStorage->updateCustomOptions($validProducts);
+        $this->weeeStorage->updateWeees($validProducts);
+        if ($config->categoryStrategy === ImportConfig::CATEGORY_STRATEGY_SET) {
+            $this->productEntityStorage->removeOldCategoryIds($validProducts);
+        }
         $this->productEntityStorage->insertCategoryIds($validProducts);
+        if ($config->websiteStrategy === ImportConfig::WEBSITE_STRATEGY_SET) {
+            $this->productEntityStorage->removeOldWebsiteIds($validProducts);
+        }
         $this->productEntityStorage->insertWebsiteIds($validProducts);
         $this->stockItemStorage->storeStockItems($validProducts);
         $this->linkedProductStorage->updateLinkedProducts($validProducts);
         $this->imageStorage->storeProductImages($validProducts,
-            $config->imageStrategy === ImportConfig::IMAGE_STRATEGY_SET);
+            $config->imageStrategy === ImportConfig::IMAGE_STRATEGY_SET,
+            $config->existingImageStrategy == ImportConfig::EXISTING_IMAGE_STRATEGY_FORCE_DOWNLOAD);
         $this->tierPriceStorage->updateTierPrices($validProducts);
 
         // url_rewrite (must be done after url_key and category_id)
@@ -322,6 +357,10 @@ class ProductStorage
 
         if (version_compare($this->metaData->magentoVersion, "2.3.0") >= 0) {
             $this->sourceItemStorage->storeSourceItems($validProducts);
+        }
+
+        if ($config->M2EPro === ImportConfig::M2EPRO_YES) {
+            $this->m2EProNotification->notify($validProducts);
         }
     }
 

@@ -22,7 +22,7 @@ class MsiTest extends \Magento\TestFramework\TestCase\AbstractController
     /** @var Magento2DbConnection */
     protected static $db;
 
-    public static function setUpBeforeClass()
+    public static function setUpBeforeClass(): void
     {
         $objectManager = \Magento\TestFramework\Helper\Bootstrap::getObjectManager();
 
@@ -42,6 +42,10 @@ class MsiTest extends \Magento\TestFramework\TestCase\AbstractController
     public function testInventorySourceItem()
     {
         if (version_compare(self::$metaData->magentoVersion, '2.3.0') < 0) {
+            return;
+        }
+
+        if (empty(self::$db->fetchSingleCell("SHOW TABLES LIKE '" . self::$metaData->inventorySourceItem . "'"))) {
             return;
         }
 
@@ -108,6 +112,10 @@ class MsiTest extends \Magento\TestFramework\TestCase\AbstractController
     public function testResolveAndValidate()
     {
         if (version_compare(self::$metaData->magentoVersion, '2.3.0') < 0) {
+            return;
+        }
+
+        if (empty(self::$db->fetchSingleCell("SHOW TABLES LIKE '" . self::$metaData->inventorySourceItem . "'"))) {
             return;
         }
 
